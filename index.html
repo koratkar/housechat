@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iMessage Meme Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --phone-font-size-multiplier: 1; /* Default font size multiplier */
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f0f0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
+            position: relative; 
+        }
+
+        .custom-notification {
+            position: fixed; 
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0,0,0,0.8);
+            color: white;
+            padding: 12px 22px;
+            border-radius: 8px;
+            z-index: 10000; 
+            font-size: 14px;
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out, top 0.3s ease-in-out;
+            pointer-events: none;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+        .custom-notification.show {
+            opacity: 1;
+            top: 30px; 
+            pointer-events: auto;
+        }
+
+        .controls-container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 600px;
+            z-index: 100; 
+        }
+
+        .phone-container {
+            width: 100%;
+            max-width: 420px;
+            height: 800px;
+            background-color: #ffffff;
+            border-radius: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid #d1d1d1;
+            z-index: 50;
+        }
+        
+        .status-bar, .chat-header, .message-input-area,
+        .status-bar span, .chat-header div, .message-input-area input, 
+        .message-input-area select, .message-input-area button {
+             font-size: calc(14px * var(--phone-font-size-multiplier));
+        }
+        .message-bubble {
+             font-size: calc(16px * var(--phone-font-size-multiplier));
+             /* Bubble Sizing and Text Wrapping Rules */
+             width: fit-content; /* Bubble width adapts to content */
+             min-width: 0; /* Allows shrinking for very small content */
+             max-width: 75%;   /* Maximum width of the bubble */
+             overflow-wrap: break-word; /* Standard property for breaking long words */
+             word-break: normal; /* Break words normally; overflow-wrap handles indivisible long words */
+             text-align: left; /* Explicitly align text to the left within the bubble */
+        }
+        .other-character .character-name {
+            font-size: calc(12px * var(--phone-font-size-multiplier));
+        }
+        .chat-header-text { 
+            font-size: calc(13px * var(--phone-font-size-multiplier));
+        }
+        .delete-message-btn {
+             font-size: calc(12px * var(--phone-font-size-multiplier));
+             line-height: calc(18px * var(--phone-font-size-multiplier));
+        }
+        .drag-handle {
+            font-size: calc(18px * var(--phone-font-size-multiplier));
+        }
+        .attribution {
+            font-family: monospace;
+            color: blue;
+        }
+
+
+        @media (max-width: 640px) {
+            body { padding: 0; }
+            .controls-container { margin-bottom: 0; border-radius: 0; box-shadow: none; max-width: 100%; order: 1; }
+            .phone-container { max-width: 100%; height: 100vh; border-radius: 0; border: none; order: 0; flex-grow: 1; }
+            body.controls-visible .phone-container { height: calc(100vh - 280px); } 
+        }
+
+        .status-bar {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: calc(10px * var(--phone-font-size-multiplier)) calc(20px * var(--phone-font-size-multiplier));
+            background-color: #f8f8f8; border-bottom: 1px solid #e0e0e0;
+            font-weight: 500; color: #333; flex-shrink: 0;
+        }
+        .status-bar .time { cursor: text; padding: calc(2px * var(--phone-font-size-multiplier)) calc(4px * var(--phone-font-size-multiplier)); border-radius: calc(3px * var(--phone-font-size-multiplier)); }
+        .status-bar .time:focus { outline: 1px solid #007aff; background-color: #eef; }
+        .status-bar-icons { display: flex; align-items: center; gap: calc(8px * var(--phone-font-size-multiplier)); }
+        .wifi-icon svg, .battery-icon svg { width: calc(20px * var(--phone-font-size-multiplier)); height: calc(20px * var(--phone-font-size-multiplier)); fill: #333; }
+
+        .chat-header {
+            padding: calc(8px * var(--phone-font-size-multiplier)) calc(15px * var(--phone-font-size-multiplier)) calc(12px * var(--phone-font-size-multiplier));
+            text-align: center; border-bottom: 1px solid #e0e0e0; background-color: #f8f8f8;
+            display: flex; flex-direction: column; align-items: center; flex-shrink: 0;
+        }
+        .chat-header-avatars { display: flex; justify-content: center; margin-bottom: calc(4px * var(--phone-font-size-multiplier)); height: calc(36px * var(--phone-font-size-multiplier)); }
+        .chat-header-avatars .avatar {
+            width: calc(32px * var(--phone-font-size-multiplier)); height: calc(32px * var(--phone-font-size-multiplier));
+            border-radius: 50%; object-fit: cover; border: calc(2px * var(--phone-font-size-multiplier)) solid white; background-color: #ccc;
+        }
+        .chat-header-avatars .avatar:not(:first-child) { margin-left: calc(-10px * var(--phone-font-size-multiplier)); }
+        .chat-header-text { color: #000; font-weight: 500; margin-top: calc(2px * var(--phone-font-size-multiplier)); }
+
+        .chat-area {
+            flex-grow: 1; padding: calc(15px * var(--phone-font-size-multiplier)); overflow-y: auto;
+            display: flex; flex-direction: column; gap: calc(10px * var(--phone-font-size-multiplier)); background-color: #ffffff;
+        }
+
+        .message-container {
+            display: flex; flex-direction: row; align-items: flex-start; position: relative;
+        }
+        .drag-handle {
+            cursor: grab; 
+            padding: calc(5px * var(--phone-font-size-multiplier));
+            color: #aaa; align-self: center; 
+            margin-right: calc(5px * var(--phone-font-size-multiplier));
+            opacity: 0; 
+            transition: opacity 0.2s;
+        }
+        .message-container:hover .drag-handle, .message-container.show-handle .drag-handle { opacity: 1; } 
+
+
+        .message-content { display: flex; flex-direction: column; width: 100%; }
+        
+        .message-bubble { /* padding, border-radius, position are here from before */
+            padding: calc(10px * var(--phone-font-size-multiplier)) calc(15px * var(--phone-font-size-multiplier));
+            border-radius: calc(20px * var(--phone-font-size-multiplier)); 
+            position: relative;
+        }
+        .delete-message-btn {
+            position: absolute;
+            top: calc(-5px * var(--phone-font-size-multiplier));
+            right: calc(-5px * var(--phone-font-size-multiplier));
+            background-color: red; color: white; border-radius: 50%;
+            width: calc(18px * var(--phone-font-size-multiplier));
+            height: calc(18px * var(--phone-font-size-multiplier));
+            text-align: center; cursor: pointer; opacity: 0;
+            transition: opacity 0.2s; border: 1px solid white; font-weight: bold;
+        }
+        .message-bubble:hover .delete-message-btn, .message-container.show-handle .delete-message-btn { opacity: 1; }
+
+
+        .message-container.main-character .message-content { align-items: flex-end; }
+        .message-container.main-character .message-bubble {
+            background-color: #007aff; color: white;
+            /* Tail adjustments are fine, specific to this bubble type */
+            border-top-left-radius: calc(20px * var(--phone-font-size-multiplier)); 
+            border-top-right-radius: calc(20px * var(--phone-font-size-multiplier));
+            border-bottom-left-radius: calc(20px * var(--phone-font-size-multiplier)); 
+            border-bottom-right-radius: calc(5px * var(--phone-font-size-multiplier));
+        }
+        .message-container.main-character .drag-handle { order: -1; margin-right: calc(5px * var(--phone-font-size-multiplier)); margin-left: 0; }
+
+
+        .message-container.other-character .message-content { align-items: flex-start; }
+        .other-character .message-content-wrapper {
+            display: flex; align-items: flex-end;
+            gap: calc(8px * var(--phone-font-size-multiplier)); max-width: 85%; /* This max-width is for the wrapper of pic + details */
+        }
+        .other-character .profile-pic {
+            width: calc(30px * var(--phone-font-size-multiplier)); height: calc(30px * var(--phone-font-size-multiplier));
+            border-radius: 50%; object-fit: cover; flex-shrink: 0;
+        }
+        .other-character .character-details { display: flex; flex-direction: column; align-items: flex-start; }
+        .other-character .character-name {
+            color: #8e8e93; margin-bottom: calc(2px * var(--phone-font-size-multiplier)); margin-left: calc(5px * var(--phone-font-size-multiplier));
+        }
+        .other-character .message-bubble {
+            background-color: #e5e5ea; color: black;
+            /* Tail adjustments are fine */
+            border-top-left-radius: calc(20px * var(--phone-font-size-multiplier)); 
+            border-top-right-radius: calc(20px * var(--phone-font-size-multiplier));
+            border-bottom-right-radius: calc(20px * var(--phone-font-size-multiplier)); 
+            border-bottom-left-radius: calc(5px * var(--phone-font-size-multiplier));
+            max-width: 100%;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+        .message-container.other-character .drag-handle { order: 1; margin-left: calc(5px * var(--phone-font-size-multiplier)); margin-right: 0; }
+
+
+        .message-input-area {
+            display: flex; align-items: center;
+            padding: calc(8px * var(--phone-font-size-multiplier)) calc(10px * var(--phone-font-size-multiplier));
+            border-top: 1px solid #e0e0e0; background-color: #f8f8f8; flex-shrink: 0;
+        }
+        #messageInput {
+            flex-grow: 1; padding: calc(10px * var(--phone-font-size-multiplier)) calc(15px * var(--phone-font-size-multiplier));
+            border: 1px solid #d1d5db; border-radius: calc(20px * var(--phone-font-size-multiplier));
+            margin-right: calc(8px * var(--phone-font-size-multiplier));
+        }
+        .send-button, .plus-button {
+            background-color: #007aff; color: white; border: none; border-radius: 50%;
+            width: calc(36px * var(--phone-font-size-multiplier)); height: calc(36px * var(--phone-font-size-multiplier));
+            display: flex; justify-content: center; align-items: center; cursor: pointer; flex-shrink: 0;
+        }
+        .send-button svg { width: calc(20px * var(--phone-font-size-multiplier)); height: calc(20px * var(--phone-font-size-multiplier)); }
+        .plus-button { 
+            background-color: #e5e5ea; color: #007aff; 
+            margin-right: calc(8px * var(--phone-font-size-multiplier)); 
+        }
+        .plus-button svg { width: calc(20px * var(--phone-font-size-multiplier)); height: calc(20px * var(--phone-font-size-multiplier)); stroke-width: 2; }
+        #characterSelect {
+            padding: calc(6px * var(--phone-font-size-multiplier)) calc(8px * var(--phone-font-size-multiplier));
+            border: 1px solid #d1d5db; border-radius: calc(15px * var(--phone-font-size-multiplier));
+            background-color: white; max-width: calc(120px * var(--phone-font-size-multiplier)); text-overflow: ellipsis;
+            margin-right: calc(8px * var(--phone-font-size-multiplier)); 
+        }
+        .hidden { display: none !important; }
+
+        .control-group { margin-bottom: 15px; }
+        .control-group label { display: block; margin-bottom: 5px; font-weight: 500; color: #333; }
+        .control-group input[type="text"], .control-group input[type="file"], .control-group input[type="range"], .control-group select {
+            width: 100%; padding: 8px 12px; border: 1px solid #d1d5db;
+            border-radius: 6px; box-sizing: border-box;
+        }
+        .control-group button {
+             padding: 8px 15px; background-color: #28a745; color: white;
+             border: none; border-radius: 6px; cursor: pointer; margin-top: 5px;
+        }
+        #charactersList .remove-char-btn {
+            background-color: #dc3545; color: white; padding: 4px 8px; font-size: 12px;
+        }
+        #charactersList .remove-char-btn:hover { background-color: #c82333; }
+
+        .dragging { opacity: 0.5; background: #f0f0f0; }
+        .drag-over-element { border-top: 2px dashed blue; }
+
+    </style>
+</head>
+<body class="controls-visible">
+    <div id="customNotification" class="custom-notification">Notification Message</div> 
+    <div class="flex flex-col items-center w-full">
+        <div class="controls-container" id="controlsContainer">
+            <h2 class="text-xl font-semibold mb-4 text-gray-700">Chat Setup</h2>
+
+            <div class="control-group">
+                <label for="charName">Add New Character Name:</label>
+                <input type="text" id="charName" placeholder="e.g., Alice">
+            </div>
+            <div class="control-group">
+                <label for="charImageFile">Character Image (Upload):</label>
+                <input type="file" id="charImageFile" accept="image/*">
+            </div>
+            <button onclick="addCharacterViaUpload()" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow">Add Uploaded Character</button>
+
+            <div class="control-group mt-6">
+                <label for="mainCharacterSelect">Main Character (Blue, Right Messages):</label>
+                <select id="mainCharacterSelect" onchange="updateMainCharacter()" class="mb-2"></select>
+                <div id="charactersList" class="text-sm text-gray-600"></div>
+            </div>
+            
+            <div class="control-group mt-6">
+                <label for="chatHeaderText">Chat Name / Contact:</label>
+                <input type="text" id="chatHeaderText" value="Princeton Plainsboro Teaching Hospital" oninput="updateChatVisuals()">
+            </div>
+
+            <div class="control-group mt-4">
+                <label class="flex items-center">
+                    <input type="checkbox" id="toggleCharacterSelector" onchange="toggleCharacterSelectorVisibility()" class="mr-2">
+                    Hide Character Selector in Chat Input
+                </label>
+            </div>
+            
+            <div class="control-group mt-4">
+                <label for="fontSizeSlider">Phone Text Size:</label>
+                <input type="range" id="fontSizeSlider" min="0.7" max="1.5" step="0.05" value="1" oninput="updateFontSize(this.value)">
+            </div>
+
+           <!--- <button onclick="takeScreenshotWithHtml2Canvas()" class="mt-4 bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-lg shadow">Download Chat Screenshot</button> ---!>
+           <!---  <p class="text-xs text-gray-500 mt-1">If screenshot has issues, try your OS screenshot tool.</p> ---!>
+        </div>
+
+        <div class="phone-container" id="phoneContainer">
+            <div class="status-bar">
+                <span id="timeDisplay" contenteditable="true" onblur="saveTime(this)">9:41</span>
+                <div class="status-bar-icons">
+                    <span class="wifi-icon">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="100" height="100">
+  <!-- Device dot at bottom -->
+  <circle cx="12" cy="19" r="1.5" fill="currentColor"/>
+  
+  <!-- Inner signal arc -->
+  <path d="M8.25 15.25C9.5 14 10.75 13.5 12 13.5s2.5 0.5 3.75 1.75" 
+        stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+  
+  <!-- Middle signal arc -->
+  <path d="M5.25 12.25C7.25 10.25 9.5 9.25 12 9.25s4.75 1 6.75 3" 
+        stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+  
+  <!-- Outer signal arc -->
+  <path d="M2.25 9.25C5 6.5 8.25 5 12 5s7 1.5 9.75 4.25" 
+        stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+</svg></span>
+<span class="battery-icon"><svg viewBox="0 0 24 24"><path d="M16 6H15V4C15 3.44772 14.5523 3 14 3H10C9.44772 3 9 3.44772 9 4V6H8C6.89543 6 6 6.89543 6 8V19C6 20.1046 6.89543 21 8 21H16C17.1046 21 18 20.1046 18 19V8C18 6.89543 17.1046 6 16 6ZM7 19V8C7 7.44772 7.44772 7 8 7H16C16.5523 7 17 7.44772 17 8V19C17 19.5523 16.5523 20 16 20H8C7.44772 20 7 19.5523 7 19Z" fill="#333"></path><rect x="8" y="13" width="8" height="6" fill="#333"></rect></svg></span>
+                    <span>60%</span>
+                </div>
+            </div>
+            <div class="chat-header">
+                <div id="chatAvatarCluster" class="chat-header-avatars"></div>
+                <div id="chatHeaderDisplayText" class="chat-header-text">Princeton Plainsboro Teaching Hospital</div>
+            </div>
+            <div class="chat-area" id="chatArea"></div>
+            <div class="message-input-area">
+                <button id="plusButton" class="plus-button hidden" onclick="toggleCharacterSelectorVisibility(true)">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                </button>
+                <select id="characterSelect" class="hidden"></select> 
+                <input type="text" id="messageInput" placeholder="iMessage" onkeypress="handleKeyPress(event)">
+                <button onclick="sendMessage()" class="send-button" aria-label="Send message">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" /></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+    <br><br>
+        <p>Project by <a class="attribution" href="https://github.com/koratkar">Ishaan Koratkar</a>.</p>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script>
+        let characters = [];
+        let mainCharacterId = null;
+        let messages = []; 
+
+        const getEl = (id) => document.getElementById(id);
+        const chatArea = getEl('chatArea');
+        const messageInput = getEl('messageInput');
+        const characterSelect = getEl('characterSelect');
+        const mainCharacterSelect = getEl('mainCharacterSelect');
+        const charactersListDiv = getEl('charactersList');
+        const timeDisplay = getEl('timeDisplay');
+        const charNameInput = getEl('charName');
+        const charImageFileInput = getEl('charImageFile');
+        const chatHeaderDisplayText = getEl('chatHeaderDisplayText');
+        const chatHeaderTextIn = getEl('chatHeaderText');
+        const chatAvatarCluster = getEl('chatAvatarCluster');
+        const customNotification = getEl('customNotification');
+        const plusButton = getEl('plusButton');
+        const toggleCharacterSelectorCheckbox = getEl('toggleCharacterSelector');
+        const fontSizeSlider = getEl('fontSizeSlider');
+
+        const initialCharacterFilenames = ["Chase.png", "House.png", "Foreman.png", "Patient.png", "Cameron.png", "Cuddy.png", "Wilson.png"];
+
+        function showNotification(message, duration = 3000) {
+            customNotification.textContent = message;
+            customNotification.classList.add('show');
+            setTimeout(() => { customNotification.classList.remove('show'); }, duration);
+        }
+
+        function generateUniqueId() {
+            return `id_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        }
+        
+        function updateFontSize(multiplier) {
+            document.documentElement.style.setProperty('--phone-font-size-multiplier', multiplier);
+        }
+
+        function _addCharacter(name, imageSrc, isUploaded = false, isInitialLoad = false) {
+            if (!name) { showNotification("Character name cannot be empty."); return null; }
+            if (!imageSrc) { showNotification("Image source is missing for " + name); return null; }
+
+            const newCharacter = {
+                id: generateUniqueId(),
+                name: name,
+                image: imageSrc,
+                isMain: false 
+            };
+
+            const existingCharByName = characters.find(c => c.name === name);
+            if (existingCharByName) {
+                if (isInitialLoad && !existingCharByName.image.startsWith("data:")) { 
+                    console.warn(`Initial character ${name} skipped, already loaded from images/`);
+                    return null; 
+                }
+                if (isUploaded && existingCharByName.image.startsWith("data:")) { 
+                     if (!confirm(`An uploaded character named "${name}" already exists. Add another one?`)) return null;
+                }
+            }
+            
+            characters.push(newCharacter);
+            updateCharacterDropdowns(); 
+            updateCharactersList();
+            updateChatVisuals();
+            return newCharacter;
+        }
+        
+        function addCharacterViaUpload() {
+            const name = charNameInput.value.trim();
+            const imageFile = charImageFileInput.files[0];
+
+            if (!name) { showNotification("Please provide a character name for the upload."); return; }
+            if (!imageFile) { showNotification("Please upload an image for the character."); return; }
+            if (!imageFile.type.startsWith('image/')) { showNotification("Please upload a valid image file."); return; }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const char = _addCharacter(name, e.target.result, true, false);
+                if (char) {
+                    showNotification(`Character "${name}" added from upload.`);
+                    charNameInput.value = '';
+                    charImageFileInput.value = '';
+                }
+            };
+            reader.onerror = () => showNotification("Error reading uploaded image file.");
+            reader.readAsDataURL(imageFile);
+        }
+
+        function updateCharacterDropdowns() {
+            characterSelect.innerHTML = '';
+            mainCharacterSelect.innerHTML = '';
+            const defaultOptText = "Add characters";
+
+            if (characters.length === 0) {
+                const createDisabledOption = (text) => {
+                    const opt = document.createElement('option');
+                    opt.textContent = text; opt.disabled = true; return opt;
+                };
+                characterSelect.appendChild(createDisabledOption(defaultOptText));
+                mainCharacterSelect.appendChild(createDisabledOption(defaultOptText));
+                return;
+            }
+
+            characters.forEach(char => {
+                const option = document.createElement('option');
+                option.value = char.id;
+                option.textContent = char.name;
+                characterSelect.appendChild(option.cloneNode(true));
+                mainCharacterSelect.appendChild(option);
+            });
+
+            if (mainCharacterId && characters.find(c => c.id === mainCharacterId)) {
+                mainCharacterSelect.value = mainCharacterId;
+                if (!characterSelect.value && characters.length > 0) characterSelect.value = mainCharacterId;
+            } else if (characters.length > 0) { 
+                mainCharacterId = characters[0].id;
+                characters[0].isMain = true;
+                mainCharacterSelect.value = mainCharacterId;
+                characterSelect.value = mainCharacterId;
+            }
+        }
+        
+        function updateCharactersList() {
+            charactersListDiv.innerHTML = '';
+            if (characters.length === 0) { charactersListDiv.innerHTML = '<p>No characters added yet.</p>'; return; }
+            
+            characters.forEach(char => {
+                const charDiv = document.createElement('div');
+                charDiv.className = 'flex justify-between items-center py-1';
+                const charInfo = document.createElement('span');
+                const imgPreview = document.createElement('img');
+                imgPreview.src = char.image;
+                imgPreview.alt = char.name;
+                imgPreview.className = 'w-6 h-6 rounded-full object-cover inline-block mr-2 align-middle';
+                imgPreview.onerror = function() { this.src = 'https://placehold.co/24x24/cccccc/ffffff?text=?'; this.alt = 'err';}
+                charInfo.appendChild(imgPreview);
+                charInfo.append(`${char.name}`);
+                if (char.id === mainCharacterId) {
+                    const mainLabel = document.createElement('span');
+                    mainLabel.textContent = ' (Main)';
+                    mainLabel.className = 'font-semibold text-blue-600';
+                    charInfo.appendChild(mainLabel);
+                }
+                charDiv.appendChild(charInfo);
+                const removeButton = document.createElement('button');
+                removeButton.textContent = 'Remove';
+                removeButton.className = 'remove-char-btn rounded';
+                removeButton.onclick = () => removeCharacter(char.id);
+                charDiv.appendChild(removeButton);
+                charactersListDiv.appendChild(charDiv);
+            });
+        }
+
+        function removeCharacter(charIdToRemove) {
+            if (!confirm("Are you sure you want to remove this character? This will also remove their messages from the chat.")) return;
+            const removedCharName = characters.find(c => c.id === charIdToRemove)?.name || "Character";
+            characters = characters.filter(char => char.id !== charIdToRemove);
+            messages = messages.filter(msg => msg.characterId !== charIdToRemove);
+            if (mainCharacterId === charIdToRemove) {
+                mainCharacterId = characters.length > 0 ? characters[0].id : null;
+                if (mainCharacterId) characters.find(c => c.id === mainCharacterId).isMain = true;
+                else if (characters.length > 0) { 
+                     mainCharacterId = characters[0].id;
+                     characters[0].isMain = true;
+                }
+            }
+            updateCharacterDropdowns();
+            updateCharactersList();
+            updateChatVisuals();
+            redrawAllMessages();
+            showNotification(`"${removedCharName}" removed.`);
+        }
+
+        function updateMainCharacter() {
+            const selectedId = mainCharacterSelect.value;
+            const newMainChar = characters.find(c => c.id === selectedId);
+
+            if (newMainChar) {
+                mainCharacterId = newMainChar.id;
+                characters.forEach(char => { char.isMain = (char.id === mainCharacterId); });
+            } else if (characters.length > 0) { 
+                mainCharacterId = characters[0].id;
+                characters.forEach(char => { char.isMain = (char.id === mainCharacterId); });
+                mainCharacterSelect.value = mainCharacterId; 
+            } else {
+                mainCharacterId = null; 
+            }
+            
+            updateCharactersList(); 
+            updateChatVisuals();
+            redrawAllMessages(); 
+        }
+
+        let draggedMessageId = null; 
+
+        function sendMessage() {
+            const text = messageInput.value.trim();
+            const selectedCharacterId = characterSelect.value;
+
+            if (!text) { showNotification("Message cannot be empty."); return; }
+            if (characters.length === 0) { showNotification("Please add characters first."); return; }
+            if (!selectedCharacterId) { showNotification("Please select a character."); return; }
+            if (!mainCharacterId) { showNotification("Please designate a main character."); return; }
+
+            const messageData = {
+                id: generateUniqueId(), 
+                characterId: selectedCharacterId,
+                text: text,
+                timestamp: Date.now() 
+            };
+            messages.push(messageData);
+            displayMessage(messageData); 
+            messageInput.value = '';
+            chatArea.scrollTop = chatArea.scrollHeight; 
+        }
+
+        function displayMessage(messageData, prepend = false) {
+            const character = characters.find(char => char.id === messageData.characterId);
+            if (!character) return;
+
+            const messageContainer = document.createElement('div');
+            messageContainer.classList.add('message-container');
+            messageContainer.setAttribute('draggable', 'true');
+            messageContainer.dataset.messageId = messageData.id; 
+
+            messageContainer.addEventListener('click', (e) => { 
+                if (e.target.classList.contains('delete-message-btn')) return; 
+                document.querySelectorAll('.message-container.show-handle').forEach(mc => {
+                    if (mc !== messageContainer) mc.classList.remove('show-handle');
+                });
+                messageContainer.classList.toggle('show-handle');
+            });
+
+            const dragHandle = document.createElement('span');
+            dragHandle.classList.add('drag-handle');
+            dragHandle.innerHTML = '&#x2630;'; 
+            messageContainer.appendChild(dragHandle);
+            
+            const messageContentDiv = document.createElement('div');
+            messageContentDiv.classList.add('message-content');
+
+            const messageBubble = document.createElement('div');
+            messageBubble.classList.add('message-bubble');
+            messageBubble.textContent = messageData.text;
+
+            const deleteBtn = document.createElement('span');
+            deleteBtn.classList.add('delete-message-btn');
+            deleteBtn.innerHTML = '&times;'; 
+            deleteBtn.onclick = (e) => {
+                e.stopPropagation(); 
+                deleteMessage(messageData.id);
+            };
+            messageBubble.appendChild(deleteBtn);
+
+            if (character.id === mainCharacterId) {
+                messageContainer.classList.add('main-character');
+                messageContentDiv.appendChild(messageBubble);
+            } else {
+                messageContainer.classList.add('other-character');
+                const contentWrapper = document.createElement('div');
+                contentWrapper.classList.add('message-content-wrapper'); 
+                const profilePic = document.createElement('img');
+                profilePic.classList.add('profile-pic');
+                profilePic.src = character.image;
+                profilePic.alt = character.name;
+                profilePic.onerror = function() { this.src = 'https://placehold.co/30x30/cccccc/ffffff?text=?'; this.alt = 'Img err'; };
+                contentWrapper.appendChild(profilePic);
+                const characterDetailsDiv = document.createElement('div');
+                characterDetailsDiv.classList.add('character-details'); 
+                const characterName = document.createElement('div');
+                characterName.classList.add('character-name');
+                characterName.textContent = character.name;
+                characterDetailsDiv.appendChild(characterName);
+                characterDetailsDiv.appendChild(messageBubble);
+                contentWrapper.appendChild(characterDetailsDiv);
+                messageContentDiv.appendChild(contentWrapper);
+            }
+            messageContainer.appendChild(messageContentDiv);
+
+            if (prepend) chatArea.prepend(messageContainer);
+            else chatArea.appendChild(messageContainer);
+
+            addDragEvents(messageContainer);
+        }
+
+        function deleteMessage(messageId) {
+            if (!confirm("Delete this message?")) return;
+            messages = messages.filter(msg => msg.id !== messageId);
+            redrawAllMessages();
+            showNotification("Message deleted.");
+        }
+        
+        function redrawAllMessages() {
+            chatArea.innerHTML = ''; 
+            messages.forEach(msg => displayMessage(msg)); 
+            requestAnimationFrame(() => {
+                chatArea.scrollTop = chatArea.scrollHeight;
+            });
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+
+        function addDragEvents(element) {
+            element.addEventListener('dragstart', handleDragStart);
+            element.addEventListener('dragover', handleDragOver);
+            element.addEventListener('dragleave', handleDragLeave);
+            element.addEventListener('drop', handleDrop);
+            element.addEventListener('dragend', handleDragEnd);
+        }
+
+        function handleDragStart(e) {
+            const container = e.target.closest('.message-container');
+            if (!container) return;
+            draggedMessageId = container.dataset.messageId;
+            container.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            try { e.dataTransfer.setData('text/plain', draggedMessageId); } catch (err) { /* Firefox fix */ }
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            const targetElement = e.target.closest('.message-container');
+            if (targetElement && targetElement.dataset.messageId !== draggedMessageId) {
+                document.querySelectorAll('.drag-over-element').forEach(el => el.classList.remove('drag-over-element'));
+                targetElement.classList.add('drag-over-element');
+            }
+        }
+        
+        function handleDragLeave(e) {
+            const targetElement = e.target.closest('.message-container');
+            if (targetElement) {
+                targetElement.classList.remove('drag-over-element');
+            }
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            const droppedOnElement = e.target.closest('.message-container');
+            if (!droppedOnElement) return;
+            const droppedOnMessageId = droppedOnElement.dataset.messageId;
+
+            document.querySelectorAll('.drag-over-element').forEach(el => el.classList.remove('drag-over-element'));
+            if (!droppedOnMessageId || droppedOnMessageId === draggedMessageId) return;
+
+            const draggedMsgIndex = messages.findIndex(msg => msg.id === draggedMessageId);
+            let droppedOnMsgIndex = messages.findIndex(msg => msg.id === droppedOnMessageId);
+
+            if (draggedMsgIndex === -1 || droppedOnMsgIndex === -1) return;
+            
+            const [draggedItem] = messages.splice(draggedMsgIndex, 1);
+            if (draggedMsgIndex < droppedOnMsgIndex) {
+                droppedOnMsgIndex--; 
+            }
+            messages.splice(droppedOnMsgIndex, 0, draggedItem); 
+
+            redrawAllMessages();
+        }
+
+        function handleDragEnd(e) {
+            const container = e.target.closest('.message-container');
+            if(container) container.classList.remove('dragging');
+            document.querySelectorAll('.drag-over-element').forEach(el => el.classList.remove('drag-over-element'));
+            draggedMessageId = null;
+        }
+
+        function saveTime(element) {
+            if (element.textContent.trim() === "") element.textContent = "9:41";
+        }
+        
+        function updateChatVisuals() {
+            chatHeaderDisplayText.textContent = chatHeaderTextIn.value || "Princeton Plainsboro Teaching Hospital";
+            chatAvatarCluster.innerHTML = '';
+            const participants = characters.slice(0, 4);
+            participants.forEach(char => {
+                const avatarImg = document.createElement('img');
+                avatarImg.src = char.image;
+                avatarImg.alt = char.name;
+                avatarImg.className = 'avatar';
+                avatarImg.onerror = function() { this.src = 'https://placehold.co/32x32/cccccc/ffffff?text=?'; };
+                chatAvatarCluster.appendChild(avatarImg);
+            });
+        }
+
+        function toggleCharacterSelectorVisibility(forceShow = null) {
+            const isHidden = forceShow === null ? toggleCharacterSelectorCheckbox.checked : !forceShow;
+            if (forceShow !== null) toggleCharacterSelectorCheckbox.checked = !isHidden;
+            
+            characterSelect.classList.toggle('hidden', isHidden);
+            plusButton.classList.toggle('hidden', !isHidden);
+            
+            if (isHidden) { 
+                messageInput.style.marginLeft = '0px'; 
+            } else { 
+                messageInput.style.marginLeft = '0px'; 
+            }
+        }
+
+        function takeScreenshotWithHtml2Canvas() {
+            const phoneElement = getEl('phoneContainer');
+            if (!phoneElement) { showNotification("Screenshot error: Phone element not found."); return; }
+            showNotification("Preparing screenshot...", 2000);
+
+            const originalToggleState = toggleCharacterSelectorCheckbox.checked;
+            characterSelect.classList.add('hidden');
+            plusButton.classList.remove('hidden');
+            toggleCharacterSelectorCheckbox.checked = true; 
+
+            document.querySelectorAll('.drag-handle, .delete-message-btn, .message-container.show-handle .drag-handle, .message-container.show-handle .delete-message-btn')
+                .forEach(el => el.style.opacity = '0'); 
+
+            const originalChatAreaOverflow = chatArea.style.overflowY;
+            const originalChatAreaHeight = chatArea.style.height;
+            chatArea.style.overflowY = 'visible'; chatArea.style.height = 'auto';
+            const currentScrollTop = chatArea.scrollTop; 
+            phoneElement.scrollTop = 0; chatArea.scrollTop = 0;
+
+            html2canvas(phoneElement, {
+                allowTaint: true, 
+                useCORS: true,    
+                scrollY: -window.scrollY, 
+                scrollX: 0,
+                backgroundColor: '#ffffff', 
+                logging: false, 
+                onclone: (clonedDoc) => {
+                    clonedDoc.querySelectorAll('.drag-handle, .delete-message-btn').forEach(el => el.style.opacity = '0');
+                }
+            }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = 'imessage-chat.png';
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+                showNotification("Screenshot downloaded!", 3000);
+            }).catch(err => {
+                console.error("html2canvas error:", err);
+                showNotification("Screenshot failed. Error: " + err.message + ". Try OS screenshot.", 5000);
+            }).finally(() => {
+                chatArea.style.overflowY = originalChatAreaOverflow;
+                chatArea.style.height = originalChatAreaHeight;
+                chatArea.scrollTop = currentScrollTop; 
+                
+                toggleCharacterSelectorCheckbox.checked = originalToggleState;
+                toggleCharacterSelectorVisibility(); 
+                document.querySelectorAll('.drag-handle, .delete-message-btn').forEach(el => el.style.opacity = ''); 
+            });
+        }
+
+        function initializeApp() {
+            initialCharacterFilenames.forEach(filename => {
+                let charName = filename.substring(0, filename.lastIndexOf('.')) || filename;
+                charName = charName.replace(/[\W_]+/g," ").replace(/\s+/g, ' ').trim(); 
+                charName = charName.replace(/\b\w/g, l => l.toUpperCase());
+                _addCharacter(charName, `images/${filename}`, false, true);
+            });
+
+            const patientChar = characters.find(c => c.image === "images/Patient.png");
+            if (patientChar) {
+                mainCharacterId = patientChar.id;
+                patientChar.isMain = true;
+            } else if (characters.length > 0) { 
+                mainCharacterId = characters[0].id;
+                characters[0].isMain = true;
+            }
+            
+            characters.forEach(char => {
+                if (char.id !== mainCharacterId) char.isMain = false;
+            });
+
+            updateCharacterDropdowns();
+            updateCharactersList();
+            updateChatVisuals();
+            toggleCharacterSelectorVisibility(); 
+            updateFontSize(fontSizeSlider.value); 
+            showNotification("Welcome! Characters loaded. Start your chat.", 3000);
+            if (window.innerWidth <= 640) document.body.classList.remove('controls-visible');
+        }
+        document.addEventListener('DOMContentLoaded', initializeApp);
+    </script>
+</body>
+</html>
+
