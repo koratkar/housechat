@@ -288,12 +288,12 @@
                 <input type="text" id="chatHeaderText" value="Princeton Plainsboro Teaching Hospital" oninput="updateChatVisuals()">
             </div>
 
-            <div class="control-group mt-4">
+<!---       <div class="control-group mt-4">
                 <label class="flex items-center">
                     <input type="checkbox" id="toggleCharacterSelector" onchange="toggleCharacterSelectorVisibility()" class="mr-2">
                     View mode (hides character selector for export)
                 </label>
-            </div>
+            </div> ---!>
             
             <div class="control-group mt-4">
                 <label for="fontSizeSlider">Phone Text Size:</label>
@@ -335,17 +335,21 @@
             </div>
             <div class="chat-area" id="chatArea"></div>
             <div class="message-input-area">
-                <button id="plusButton" class="plus-button hidden" onclick="toggleCharacterSelectorVisibility(true)">
+                <button id="plusButton" class="plus-button">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
                 </button>
-                <select id="characterSelect" class="hidden"></select> 
                 <input type="text" id="messageInput" placeholder="iMessage" onkeypress="handleKeyPress(event)">
                 <button onclick="sendMessage()" class="send-button" aria-label="Send message">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" /></svg>
                 </button>
             </div>
         </div>
+        <br>
+                        <p>Select character:</p><select id="characterSelect"></select>
+                        <br>
+
     </div>
+
     <br><br>
         <p>Project by <a class="attribution" href="https://github.com/koratkar">Ishaan Koratkar</a>.</p>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -833,4 +837,3 @@
     </script>
 </body>
 </html>
-
