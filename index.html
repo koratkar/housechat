@@ -635,7 +635,6 @@
         }
 
         function deleteMessage(messageId) {
-            if (!confirm("Delete this message?")) return;
             messages = messages.filter(msg => msg.id !== messageId);
             redrawAllMessages();
             showNotification("Message deleted.");
